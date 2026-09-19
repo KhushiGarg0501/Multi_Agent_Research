@@ -8,17 +8,50 @@ from dotenv import load_dotenv
 load_dotenv()
 
 #model setup 
-llm = ChatGoogleGenerativeAI(model = "gemini-3.5-flash",temperature=0.3)
+llm = ChatGoogleGenerativeAI(model = "gemini-3.6-flash",temperature=0.3)
+
+#1st agent
+def build_planner_agent():
+
+    planner_prompt = """
+You are a research planning agent.
+
+Your job is to take a research topic and break it into
+5-6 specific research questions that need to be investigated.
+
+The questions should cover:
+
+1. Background and definition
+2. Current situation and recent developments
+3. Major benefits or positive impacts
+4. Major challenges, risks, or limitations
+5. Evidence, statistics, or real-world examples
+6. Future outlook
+
+Rules:
+- Questions must be specific and researchable.
+- Avoid duplicate questions.
+- Avoid questions that are too broad.
+- Questions should be answerable using reliable web sources.
+
+Return ONLY a numbered list of research questions.
+"""
+
+    return create_agent(
+        model=llm,
+        tools=[],
+        system_prompt=planner_prompt
+    )
 
 
-#1st agent 
+#2nd agent 
 def build_search_agent():
     return create_agent(
         model = llm,
         tools= [web_search]
     )
 
-#2nd agent 
+#3rd agent 
 
 def build_reader_agent():
     return create_agent(
@@ -75,3 +108,36 @@ One line verdict:
 ])
 
 critic_chain = critic_prompt | llm | StrOutputParser()
+
+if __name__ == "__main__":
+
+    planner = build_planner_agent()
+
+    result = planner.invoke({
+        "messages": [
+            {
+                "role": "user",
+                "content": "Research the impact of Generative AI on software engineering."
+            }
+        ]
+    })
+
+    print(result["messages"][-1].content)
+
+    if __name__ == "__main__":
+
+        planner = build_planner_agent()
+
+        result = planner.invoke({
+            "messages": [
+                {
+                    "role": "user",
+                    "content": """
+                    Create a research plan for:
+                    Impact of Generative AI on Software Engineering
+                    """
+                }
+            ]
+        })  
+
+        print(result["messages"][-1].content)
