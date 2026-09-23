@@ -12,9 +12,27 @@ tavily = TavilyClient( api_key = os.getenv("TAVILY_API_KEY"))
 @tool
 def web_search(query : str) ->str:
     """ Search the web for recent and reliable information on a topic. Retuens Titles, Urls , and snippets"""
-    result= tavily.search( query=query, max_results= 6)
+    result = tavily.search(query=query, max_results=3)
+
+    trusted_domains = [
+        "arxiv.org",
+        "ibm.com",
+        "microsoft.com",
+        "dora.dev",
+        "acm.org",
+        "ieee.org",
+        "github.blog",
+        "mit.edu",
+    ]
+
+    filtered_results = [
+        r for r in result["results"]
+        if any(domain in r["url"] for domain in trusted_domains)
+    ]
+
     out = []
-    for r in result['results']:
+
+    for r in filtered_results:
         out.append(
             f"Title : {r['title']} \n URL: {r['url']} \n Snippets: {r['content'][:300]}\n"
         )
