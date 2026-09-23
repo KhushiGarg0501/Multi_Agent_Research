@@ -9,6 +9,8 @@ class ResearchState(TypedDict):
     search_results: list[str]
     articles: list[str]
     report: str
+    critique: str
+    revision_count: int
 
 
 def planner_node(state: ResearchState):
@@ -113,12 +115,48 @@ def writer_node(state: ResearchState):
 
     research = "\n\n".join(state["articles"])
 
+    critique = state.get("critique", "")
+
     report = writer_chain.invoke({
         "topic": state["topic"],
-        "research": research
+        "research": research,
+        "critique": critique
     })
 
-    return {"report": report}
+    return {
+        "report": report,
+        "revision_count": state.get("revision_count", 0) + 1
+    }
+
+def critic_node(state: ResearchState):
+    print("\n--- CRITIC NODE ---")
+
+    from agents import critic_chain
+
+    critique = critic_chain.invoke({
+        "report": state["report"]
+    })
+
+    return {"critique": critique}
+
+def critic_decision(state: ResearchState):
+    critique = state["critique"]
+
+    if "Score:" in critique:
+        try:
+            score_text = critique.split("Score:")[1].split("/")[0].strip()
+            score = float(score_text)
+
+            if score >= 7:
+                return "end"
+
+        except ValueError:
+            pass
+
+    if state.get("revision_count", 0) >= 2:
+        return "end"
+
+    return "revise"
 
 graph_builder = StateGraph(ResearchState)
 
@@ -126,19 +164,31 @@ graph_builder.add_node("planner", planner_node)
 graph_builder.add_node("search", search_node)
 graph_builder.add_node("reader", reader_node)
 graph_builder.add_node("writer", writer_node)
+graph_builder.add_node("critic", critic_node)
 
 graph_builder.add_edge(START, "planner")
 graph_builder.add_edge("planner", "search")
 graph_builder.add_edge("search", "reader")
 graph_builder.add_edge("reader", "writer")
-graph_builder.add_edge("writer", END)
+graph_builder.add_edge("writer", "critic")
+
+graph_builder.add_conditional_edges(
+    "critic",
+    critic_decision,
+    {
+        "end": END,
+        "revise": "writer"
+    }
+)
 
 graph = graph_builder.compile()
 
 
+
 if __name__ == "__main__":
     result = graph.invoke({
-        "topic": "Impact of Generative AI on Software Engineering"
+        "topic": "Impact of Generative AI on Software Engineering",
+        "revision_count": 0
     })
 
     print("\n--- RESEARCH QUESTIONS ---")
@@ -147,16 +197,19 @@ if __name__ == "__main__":
         print(f"{i}. {question}")
 
     print("\n--- SEARCH RESULTS ---")
-
     for i, search_result in enumerate(result["search_results"], 1):
         print(f"\n### Question {i}")
-        print(search_result[:1500])
+        print(search_result[:1000])
 
     print("\n--- ARTICLES ---")
+    print(f"Total articles collected: {len(result['articles'])}")
 
     for i, article in enumerate(result["articles"], 1):
-        print(f"\n### Article {i}")
-        print(article[:2000])    
+        first_line = article.split("\n")[0]
+        print(f"Article {i}: {first_line}")
 
     print("\n--- FINAL REPORT ---")
     print(result["report"])
+
+    print("\n--- CRITIQUE ---")
+    print(result["critique"])

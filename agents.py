@@ -71,6 +71,14 @@ Topic: {topic}
 Research Gathered:
 {research}
 
+Previous Critique:
+{critique}
+
+If a previous critique is provided, revise the report specifically
+to address the critique. Improve source quality, remove unsupported
+claims, clarify statistics, and fix any structural problems identified
+by the critic.
+
 Structure the report as:
 - Introduction
 - Key Findings (minimum 3 well-explained points)
