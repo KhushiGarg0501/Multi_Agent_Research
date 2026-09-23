@@ -25,14 +25,20 @@ def web_search(query : str) ->str:
         "mit.edu",
     ]
 
-    filtered_results = [
+    trusted_results = [
         r for r in result["results"]
         if any(domain in r["url"] for domain in trusted_domains)
     ]
 
+    selected_results = trusted_results[:3]
+
+    for r in result["results"]:
+        if r not in selected_results and len(selected_results) < 3:
+            selected_results.append(r)
+
     out = []
 
-    for r in filtered_results:
+    for r in selected_results:
         out.append(
             f"Title : {r['title']} \n URL: {r['url']} \n Snippets: {r['content'][:300]}\n"
         )
