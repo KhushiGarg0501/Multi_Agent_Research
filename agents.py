@@ -9,8 +9,8 @@ load_dotenv()
 
 #model setup 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-3.7-flash",
-    max_retries=5,
+    model="gemini-3.5-flash",
+    max_retries=10,
 )
 
 #1st agent
