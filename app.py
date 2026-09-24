@@ -1,9 +1,9 @@
 import streamlit as st
 from graph import graph
 
-# ============================================================
+
 # PAGE CONFIG
-# ============================================================
+
 
 st.set_page_config(
     page_title="AI Research System",
@@ -12,9 +12,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ============================================================
+
 # CUSTOM CSS
-# ============================================================
+
 
 st.markdown("""
 <style>

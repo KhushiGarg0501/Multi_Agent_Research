@@ -8,7 +8,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 #model setup 
-llm = ChatGoogleGenerativeAI(model = "gemini-3.6-flash",temperature=0.3)
+llm = ChatGoogleGenerativeAI(
+    model="gemini-3.7-flash",
+    max_retries=5,
+)
 
 #1st agent
 def build_planner_agent():
@@ -117,35 +120,3 @@ One line verdict:
 
 critic_chain = critic_prompt | llm | StrOutputParser()
 
-if __name__ == "__main__":
-
-    planner = build_planner_agent()
-
-    result = planner.invoke({
-        "messages": [
-            {
-                "role": "user",
-                "content": "Research the impact of Generative AI on software engineering."
-            }
-        ]
-    })
-
-    print(result["messages"][-1].content)
-
-    if __name__ == "__main__":
-
-        planner = build_planner_agent()
-
-        result = planner.invoke({
-            "messages": [
-                {
-                    "role": "user",
-                    "content": """
-                    Create a research plan for:
-                    Impact of Generative AI on Software Engineering
-                    """
-                }
-            ]
-        })  
-
-        print(result["messages"][-1].content)

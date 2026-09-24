@@ -113,7 +113,10 @@ def writer_node(state: ResearchState):
 
     from agents import writer_chain
 
-    research = "\n\n".join(state["articles"][:10])
+    research = "\n\n".join(
+        article[:1500]
+        for article in state["articles"][:6]
+    )
 
     critique = state.get("critique", "")
 
