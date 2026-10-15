@@ -1,6 +1,222 @@
 import streamlit as st
 from graph import graph
+import io
+from docx import Document
+from fpdf import FPDF
+from io import BytesIO
+import re
+from docx import Document
+from docx.shared import Inches, Pt
+from io import BytesIO
+from xml.sax.saxutils import escape
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    ListFlowable,
+    ListItem,
+)
 
+
+def create_report_pdf(report: str) -> bytes:
+    """Create a formatted PDF from the research report."""
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=0.7 * inch,
+        leftMargin=0.7 * inch,
+        topMargin=0.7 * inch,
+        bottomMargin=0.7 * inch,
+        title="Research Report",
+        author="AI Research System",
+    )
+
+    base_styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        "ReportTitle",
+        parent=base_styles["Title"],
+        fontSize=20,
+        leading=26,
+        alignment=TA_CENTER,
+        spaceAfter=20,
+        textColor=colors.HexColor("#243B53"),
+    )
+
+    heading_style = ParagraphStyle(
+        "ReportHeading",
+        parent=base_styles["Heading1"],
+        fontSize=15,
+        leading=19,
+        spaceBefore=14,
+        spaceAfter=8,
+        keepWithNext=True,
+        textColor=colors.HexColor("#243B53"),
+    )
+
+    subheading_style = ParagraphStyle(
+        "ReportSubheading",
+        parent=base_styles["Heading2"],
+        fontSize=12,
+        leading=16,
+        spaceBefore=10,
+        spaceAfter=5,
+        keepWithNext=True,
+    )
+
+    body_style = ParagraphStyle(
+        "ReportBody",
+        parent=base_styles["BodyText"],
+        fontSize=9.5,
+        leading=14,
+        spaceAfter=7,
+        splitLongWords=True,
+    )
+
+    story = []
+    first_heading = True
+
+    for raw_line in report.splitlines():
+        line = raw_line.strip()
+
+        if not line:
+            story.append(Spacer(1, 4))
+            continue
+
+        # Markdown headings
+        if line.startswith("# "):
+            heading = line[2:].strip()
+
+            if first_heading:
+                story.append(
+                    Paragraph(escape(heading), title_style)
+                )
+                first_heading = False
+            else:
+                story.append(
+                    Paragraph(escape(heading), heading_style)
+                )
+            continue
+
+        if line.startswith("## "):
+            story.append(
+                Paragraph(escape(line[3:].strip()), heading_style)
+            )
+            continue
+
+        if line.startswith("### "):
+            story.append(
+                Paragraph(escape(line[4:].strip()), subheading_style)
+            )
+            continue
+
+        # Basic Markdown bullet lists
+        if line.startswith(("- ", "* ")):
+            text = escape(line[2:].strip())
+            story.append(
+                ListFlowable(
+                    [ListItem(Paragraph(text, body_style))],
+                    bulletType="bullet",
+                    leftIndent=18,
+                )
+            )
+            story.append(Spacer(1, 4))
+            continue
+
+        # Basic numbered lists
+        import re
+
+        match = re.match(r"^\d+[.)]\s+(.+)$", line)
+        if match:
+            story.append(
+                Paragraph(
+                    escape(match.group(1)),
+                    body_style,
+                    bulletText="•",
+                )
+            )
+            continue
+
+        # Regular paragraphs
+        text = escape(line)
+        text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
+        text = re.sub(r"(?<!\*)\*(.+?)\*(?!\*)", r"<i>\1</i>", text)
+
+        story.append(Paragraph(text, body_style))
+
+    if not story:
+        story.append(Paragraph("No report content available.", body_style))
+
+    def add_page_number(canvas, document):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(colors.grey)
+        canvas.drawCentredString(
+            A4[0] / 2,
+            0.35 * inch,
+            f"Page {document.page}",
+        )
+        canvas.restoreState()
+
+    doc.build(
+        story,
+        onFirstPage=add_page_number,
+        onLaterPages=add_page_number,
+    )
+
+    return buffer.getvalue()
+ 
+def create_report_docx(report: str) -> bytes:
+    """Convert a Markdown-style research report into a Word document."""
+    doc = Document()
+
+    section = doc.sections[0]
+    section.top_margin = Inches(0.75)
+    section.bottom_margin = Inches(0.75)
+    section.left_margin = Inches(0.85)
+    section.right_margin = Inches(0.85)
+
+    doc.styles["Normal"].font.name = "Arial"
+    doc.styles["Normal"].font.size = Pt(10)
+
+    for line in report.splitlines():
+        line = line.strip()
+
+        if not line:
+            continue
+
+        if line.startswith("# "):
+            doc.add_heading(line[2:].strip(), level=0)
+
+        elif line.startswith("## "):
+            doc.add_heading(line[3:].strip(), level=1)
+
+        elif line.startswith("### "):
+            doc.add_heading(line[4:].strip(), level=2)
+
+        elif line.startswith(("- ", "* ")):
+            doc.add_paragraph(line[2:].strip(), style="List Bullet")
+
+        elif re.match(r"^\d+\.\s+", line):
+            text = re.sub(r"^\d+\.\s+", "", line)
+            doc.add_paragraph(text, style="List Number")
+
+        else:
+            # Remove basic Markdown bold/italic markers.
+            text = re.sub(r"\*\*(.*?)\*\*", r"\1", line)
+            text = re.sub(r"(?<!\*)\*(.*?)\*(?!\*)", r"\1", text)
+            doc.add_paragraph(text)
+
+    buffer = BytesIO()
+    doc.save(buffer)
+    return buffer.getvalue()
 
 # PAGE CONFIG
 
@@ -255,8 +471,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.markdown('<div class="research-box">', unsafe_allow_html=True)
-
 topic = st.text_area(
     "Research Topic",
     placeholder="Example: Impact of Generative AI on Software Engineering",
@@ -316,109 +530,130 @@ for column, (icon, name) in zip(agent_columns, agent_data):
         )
 
 
+
 # ============================================================
-# REAL RESEARCH WORKFLOW
+# RESEARCH WORKFLOW + PERSISTENT RESULTS
 # ============================================================
+
+if "research_result" not in st.session_state:
+    st.session_state.research_result = None
+
+if "research_topic" not in st.session_state:
+    st.session_state.research_topic = ""
+
+if clear_button:
+    st.session_state.research_result = None
+    st.session_state.research_topic = ""
+    st.rerun()
 
 if research_button:
-
     if not topic.strip():
-
-        st.warning("⚠️ Please enter a research topic first.")
-
+        st.warning("Please enter a research topic first.")
     else:
-
-        st.divider()
-
-        st.markdown(
-            f"""
-            <div style="
-                background:#eff6ff;
-                border:1px solid #bfdbfe;
-                border-radius:12px;
-                padding:15px;
-                color:#1e40af;
-            ">
-                🔎 Researching:
-                <b>{topic}</b>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        st.markdown("### ⚡ Research Progress")
-
         progress = st.progress(0)
         status = st.empty()
 
         try:
+            status.info("Running research workflow...")
 
-            status.markdown("**🧭 Running Planner Agent...**")
-            progress.progress(15)
+            progress.progress(10)
 
             result = graph.invoke({
-                "topic": topic,
+                "topic": topic.strip(),
                 "revision_count": 0
             })
 
             progress.progress(100)
 
-            status.success("✅ Research workflow completed!")
-
-            # --------------------------------------------
-            # FINAL REPORT
-            # --------------------------------------------
-
-            st.divider()
-
-            st.markdown(
-                '<div class="section-title">📄 Final Research Report</div>',
-                unsafe_allow_html=True
-            )
-
             report = result.get("report", "")
 
-            if report:
+            if not isinstance(report, str):
+                report = str(report) if report else ""
 
-                st.markdown(
-                    '<div class="report-box">',
-                    unsafe_allow_html=True
-                )
-
-                st.markdown(report)
-
-                st.markdown(
-                    '</div>',
-                    unsafe_allow_html=True
-                )
-
-                st.download_button(
-                    label="📥 Download Report",
-                    data=report,
-                    file_name="research_report.txt",
-                    mime="text/plain"
-                )
-
+            if not report.strip():
+                st.error("The workflow finished but returned an empty report.")
             else:
-
-                st.warning(
-                    "The workflow completed, but no report was returned."
-                )
+                st.session_state.research_result = result
+                st.session_state.research_topic = topic.strip()
+                status.success("Research completed successfully!")
 
         except Exception as e:
+            status.error("Research workflow failed.")
+            st.exception(e)
 
-            progress.progress(0)
+# Render saved results OUTSIDE the button condition.
+# This keeps the report visible after normal Streamlit reruns.
 
-            st.error(
-                "❌ The research workflow could not be completed."
-            )
+result = st.session_state.research_result
 
-            st.warning(
-                "This may be caused by a Gemini API quota or "
-                "temporary service error."
-            )
+if result:
+    report = result.get("report", "")
+    report = report if isinstance(report, str) else str(report)
 
-            st.code(str(e))
+    st.divider()
+    st.markdown("## 📄 Final Research Report")
+    st.caption(f"Topic: {st.session_state.research_topic}")
+
+    # No separate opening/closing HTML divs.
+    # This removes the empty report container.
+    st.markdown(report)
+
+    st.divider()
+    
+st.subheader("📥 Download your report")
+
+col_pdf, col_docx = st.columns(2)
+
+with col_pdf:
+    pdf_bytes = create_report_pdf(report)
+
+    st.download_button(
+        label="Download PDF",
+        data=pdf_bytes,
+        file_name="research_report.pdf",
+        mime="application/pdf",
+        use_container_width=True,
+        key="download_report_pdf",
+    )
+
+with col_docx:
+    docx_bytes = create_report_docx(report)
+
+    st.download_button(
+        label="Download Word document (.docx)",
+        data=docx_bytes,
+        file_name="research_report.docx",
+        mime=(
+            "application/vnd.openxmlformats-officedocument."
+            "wordprocessingml.document"
+        ),
+        use_container_width=True,
+        key="download_report_docx",
+    )
+
+
+    # Optional diagnostics in an expandable section.
+    
+with st.expander(
+    "🔍 Research Questions and Quality Review",
+    expanded=False
+):
+    st.markdown("### Research Questions")
+    for i, question in enumerate(
+        result.get("research_questions", []), 1
+    ):
+        st.markdown(f"{i}. {question}")
+
+    st.markdown("### Critic Feedback")
+    st.write(result.get("critique", "No critique returned."))
+
+    if result.get("research_gaps"):
+        st.markdown("### Research Gaps")
+        st.write(result["research_gaps"])
+
+    if result.get("fact_check"):
+        st.markdown("### Fact-Check Findings")
+        st.write(result["fact_check"])
 
 
 # ============================================================
