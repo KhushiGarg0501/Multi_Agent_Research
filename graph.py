@@ -1,3 +1,4 @@
+from rag import retrieve_context
 from typing import TypedDict
 from langgraph.graph import StateGraph, START, END
 from agents import build_planner_agent
@@ -16,7 +17,8 @@ class ResearchState(TypedDict):
     revision_count: int
     research_gaps: str
     fact_check: str
-
+    use_uploaded_docs: bool
+    
 
 def to_text(value):
     """Convert strings or lists of text blocks into a string."""
@@ -219,43 +221,57 @@ def fact_checker_node(state: ResearchState):
 
 
 
+
+
 def writer_node(state: ResearchState):
     print("\n--- WRITER NODE ---")
 
     from agents import writer_chain
 
-    
+    # Existing evidence gathered from web research.
     research = "\n\n".join(
-        to_text(article)[:1500]
-        for article in state.get("articles", [])[:6]
+        article[:1500]
+        for article in state["articles"][:6]
     )
 
-    research_gaps = to_text(state.get("research_gaps", ""))
-    fact_check = to_text(state.get("fact_check", ""))
-    critique = to_text(state.get("critique", ""))
+    # Retrieve PDF evidence only when the user enables it.
+    if state.get("use_uploaded_docs", False):
+        query = state["topic"]
 
-    research += (
-        "\n\nRESEARCH GAPS AND MISSING EVIDENCE:\n"
-        + research_gaps
-    )
+        questions = state.get("research_questions", [])
+        if questions:
+            query += "\n" + "\n".join(questions)
 
-    if fact_check:
-        critique += (
-            "\n\nPREVIOUS FACT-CHECK FINDINGS:\n"
-            + fact_check
-        )
+        pdf_passages = retrieve_context(query, top_k=5)
+
+        if pdf_passages:
+            pdf_evidence = "\n\n".join(
+                (
+                    f"PDF SOURCE: {item['filename']}, "
+                    f"page {item['page']}\n"
+                    f"{item['text']}"
+                )
+                for item in pdf_passages
+            )
+
+            research += (
+                "\n\nUPLOADED PDF EVIDENCE:\n"
+                + pdf_evidence
+            )
+
+    critique = state.get("critique", "")
 
     report = writer_chain.invoke({
         "topic": state["topic"],
         "research": research,
-        "critique": critique
+        "critique": critique,
     })
-
 
     return {
         "report": report,
-        "revision_count": state.get("revision_count", 0) + 1
+        "revision_count": state.get("revision_count", 0) + 1,
     }
+
 
 
 

@@ -117,6 +117,15 @@ Use Markdown headings and subheadings.
 Never invent statistics, quotations, sources, or URLs.
 Clearly distinguish established findings from uncertainty.
 If evidence is insufficient for a section, state that limitation.
+
+CITATION RULES:
+- Cite PDF evidence inline using [filename, p. X].
+- Include the actual filename and page number for claims
+  supported by uploaded PDFs.
+- List web URLs only when they are provided in the research evidence.
+- Never invent a URL, PDF title, page number, statistic, or citation.
+- If web and PDF sources disagree, explain the disagreement.
+- Do not cite a source unless the supplied evidence supports the claim.
 """
     ),
     (
@@ -172,7 +181,11 @@ Synthesize the most important findings and answer the main
 research question.
 
 ## References
-List the source titles and URLs available in the supplied evidence.
+List the sources used in the report.
+
+For web sources, include the source title and URL when available.
+For uploaded PDFs, include the actual filename and relevant page number.
+Only include sources present in the supplied research evidence.
 Never fabricate a citation.
 
 Write detailed, meaningful content under each relevant heading.

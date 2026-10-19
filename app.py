@@ -1,5 +1,11 @@
 import streamlit as st
 from graph import graph
+
+from rag import (
+    index_pdf,
+    answer_question,
+    list_indexed_documents,
+)
 import io
 from docx import Document
 from fpdf import FPDF
@@ -478,6 +484,15 @@ topic = st.text_area(
     label_visibility="collapsed"
 )
 
+use_uploaded_docs = st.checkbox(
+    "📚 Include evidence from my indexed PDFs",
+    value=False,
+    help=(
+        "When enabled, the report writer retrieves relevant "
+        "passages from your locally indexed PDF library."
+    ),
+)
+
 col1, col2, col3 = st.columns([1.3, 1.3, 3])
 
 with col1:
@@ -560,7 +575,8 @@ if research_button:
 
             result = graph.invoke({
                 "topic": topic.strip(),
-                "revision_count": 0
+                "revision_count": 0,
+                "use_uploaded_docs": use_uploaded_docs,
             })
 
             progress.progress(100)
@@ -600,60 +616,202 @@ if result:
 
     st.divider()
     
-st.subheader("📥 Download your report")
 
-col_pdf, col_docx = st.columns(2)
+# DOWNLOAD REPORT + RESEARCH DIAGNOSTICS
 
-with col_pdf:
-    pdf_bytes = create_report_pdf(report)
+result = st.session_state.research_result
 
-    st.download_button(
-        label="Download PDF",
-        data=pdf_bytes,
-        file_name="research_report.pdf",
-        mime="application/pdf",
-        use_container_width=True,
-        key="download_report_pdf",
-    )
+if result:
+    report = result.get("report", "")
+    report = report if isinstance(report, str) else str(report)
 
-with col_docx:
-    docx_bytes = create_report_docx(report)
+    if report.strip():
+        st.subheader("📥 Download your report")
 
-    st.download_button(
-        label="Download Word document (.docx)",
-        data=docx_bytes,
-        file_name="research_report.docx",
-        mime=(
-            "application/vnd.openxmlformats-officedocument."
-            "wordprocessingml.document"
-        ),
-        use_container_width=True,
-        key="download_report_docx",
-    )
+        col_pdf, col_docx = st.columns(2)
 
+        with col_pdf:
+            pdf_bytes = create_report_pdf(report)
+            st.download_button(
+                label="Download PDF",
+                data=pdf_bytes,
+                file_name="research_report.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key="download_report_pdf",
+            )
 
-    # Optional diagnostics in an expandable section.
-    
-with st.expander(
-    "🔍 Research Questions and Quality Review",
-    expanded=False
-):
-    st.markdown("### Research Questions")
-    for i, question in enumerate(
-        result.get("research_questions", []), 1
+        with col_docx:
+            docx_bytes = create_report_docx(report)
+            st.download_button(
+                label="Download Word document (.docx)",
+                data=docx_bytes,
+                file_name="research_report.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+                key="download_report_docx",
+            )
+
+    with st.expander(
+        "🔍 Research Questions and Quality Review",
+        expanded=False,
     ):
-        st.markdown(f"{i}. {question}")
+        st.markdown("### Research Questions")
 
-    st.markdown("### Critic Feedback")
-    st.write(result.get("critique", "No critique returned."))
+        for i, question in enumerate(
+            result.get("research_questions", []), 1
+        ):
+            st.markdown(f"{i}. {question}")
 
-    if result.get("research_gaps"):
-        st.markdown("### Research Gaps")
-        st.write(result["research_gaps"])
+        st.markdown("### Critic Feedback")
+        st.write(result.get("critique", "No critique returned."))
 
-    if result.get("fact_check"):
-        st.markdown("### Fact-Check Findings")
-        st.write(result["fact_check"])
+        if result.get("research_gaps"):
+            st.markdown("### Research Gaps")
+            st.write(result["research_gaps"])
+
+        if result.get("fact_check"):
+            st.markdown("### Fact-Check Findings")
+            st.write(result["fact_check"])
+
+
+# ============================================================
+# PDF QUESTION-ANSWERING (RAG)
+# ============================================================
+
+st.divider()
+
+st.markdown(
+    '<div class="section-title">📚 Chat with PDFs</div>',
+    unsafe_allow_html=True,
+)
+
+st.write(
+    "Upload research papers or documents, index them, "
+    "and ask questions using their contents."
+)
+
+uploaded_pdfs = st.file_uploader(
+    "Upload PDF documents",
+    type=["pdf"],
+    accept_multiple_files=True,
+    key="rag_pdf_uploader",
+)
+
+if st.button(
+    "📥 Index uploaded PDFs",
+    use_container_width=True,
+    key="index_pdfs_button",
+):
+    if not uploaded_pdfs:
+        st.warning("Please upload at least one PDF.")
+
+    else:
+        total_chunks = 0
+
+        for pdf in uploaded_pdfs:
+            try:
+                with st.spinner(f"Indexing {pdf.name}..."):
+                    result = index_pdf(
+                        pdf.name,
+                        pdf.getvalue(),
+                    )
+
+                total_chunks += result["chunks"]
+
+                st.success(
+                    f"Indexed {result['filename']}: "
+                    f"{result['chunks']} text chunks."
+                )
+
+            except Exception as error:
+                st.error(
+                    f"Could not index {pdf.name}: {error}"
+                )
+
+        if total_chunks:
+            st.success(
+                f"Finished indexing {total_chunks} text chunks."
+            )
+
+
+# ------------------------------------------------------------
+# SHOW DOCUMENTS ALREADY STORED LOCALLY
+# ------------------------------------------------------------
+
+try:
+    indexed_documents = list_indexed_documents()
+
+    with st.expander("📂 Indexed PDF library", expanded=False):
+        if indexed_documents:
+            for filename in indexed_documents:
+                st.write(f"📄 {filename}")
+        else:
+            st.info("No PDFs have been indexed yet.")
+
+except Exception as error:
+    indexed_documents = []
+    st.warning(f"Could not load the PDF library: {error}")
+
+
+# ------------------------------------------------------------
+# ASK QUESTIONS
+# ------------------------------------------------------------
+
+st.markdown("### 💬 Ask your documents")
+
+pdf_question = st.text_input(
+    "Your question",
+    placeholder=(
+        "Example: What are the main findings of these papers?"
+    ),
+    key="pdf_question_input",
+)
+
+if st.button(
+    "🔎 Find answer",
+    use_container_width=True,
+    key="ask_pdf_question_button",
+):
+    if not pdf_question.strip():
+        st.warning("Please enter a question.")
+
+    elif not indexed_documents:
+        st.warning(
+            "Upload and index at least one PDF before asking questions."
+        )
+
+    else:
+        try:
+            with st.spinner(
+                "Searching your PDFs and generating an answer..."
+            ):
+                answer, sources = answer_question(
+                    pdf_question.strip(),
+                    top_k=5,
+                )
+
+            st.session_state["rag_answer"] = answer
+            st.session_state["rag_sources"] = sources
+            st.session_state["rag_question"] = pdf_question.strip()
+
+        except Exception as error:
+            st.error("Could not answer the question.")
+            st.code(str(error))
+
+
+# Keep the last answer visible when Streamlit reruns.
+if st.session_state.get("rag_answer"):
+    st.markdown("### 📝 Answer")
+
+    st.markdown(st.session_state["rag_answer"])
+
+    with st.expander("📖 Retrieved source passages"):
+        for source in st.session_state.get("rag_sources", []):
+            st.write(
+                f"**{source['filename']}** — "
+                f"page {source['page']}"
+            )
 
 
 # ============================================================
