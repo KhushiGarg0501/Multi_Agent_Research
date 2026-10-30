@@ -31,3 +31,6 @@ Thumbs.db
 
 # ChromaDB local database
 chroma_db/
+
+# Streamlit secrets - contains Google OAuth credentials
+.streamlit/secrets.toml
