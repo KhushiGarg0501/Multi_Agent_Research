@@ -1,3 +1,4 @@
+from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 from rag import retrieve_context
 from typing import TypedDict
 from langgraph.graph import StateGraph, START, END
@@ -18,7 +19,59 @@ class ResearchState(TypedDict):
     research_gaps: str
     fact_check: str
     use_uploaded_docs: bool
-    
+
+def normalize_url(url: str) -> str:
+    """Normalize URLs so equivalent links can be identified as duplicates."""
+    try:
+        parsed = urlparse(url.strip())
+
+        if parsed.scheme.lower() not in ("http", "https"):
+            return ""
+
+        hostname = (parsed.hostname or "").lower()
+
+        if not hostname:
+            return ""
+
+        # Treat www.example.com and example.com as the same host.
+        if hostname.startswith("www."):
+            hostname = hostname[4:]
+
+        # Remove common tracking parameters.
+        tracking_prefixes = ("utm_",)
+        tracking_params = {
+            "fbclid",
+            "gclid",
+            "dclid",
+            "mc_cid",
+            "mc_eid",
+        }
+
+        query_params = [
+            (key, value)
+            for key, value in parse_qsl(
+                parsed.query,
+                keep_blank_values=True,
+            )
+            if key.lower() not in tracking_params
+            and not key.lower().startswith(tracking_prefixes)
+        ]
+
+        path = parsed.path.rstrip("/") or "/"
+
+        # Fragments are excluded because they usually identify
+        # a section of the same page, not a separate article.
+        return urlunparse((
+            "https",
+            hostname,
+            path,
+            "",
+            urlencode(sorted(query_params)),
+            "",
+        ))
+
+    except (ValueError, TypeError):
+        return ""    
 
 def to_text(value):
     """Convert strings or lists of text blocks into a string."""
@@ -89,22 +142,70 @@ Create a research plan for:
     }
 
 
-
 def search_node(state: ResearchState):
     print("\n--- SEARCH NODE ---")
 
     from tools import web_search
 
-    questions = state["research_questions"][:4]
+    questions = state.get("research_questions", [])[:4]
+
+    if not questions:
+        print("No research questions were generated.")
+        return {"search_results": []}
 
     def run_search(question):
         print(f"Searching: {question}")
         return web_search.invoke({"query": question})
 
     with ThreadPoolExecutor(max_workers=4) as executor:
-        search_results = list(executor.map(run_search, questions))
+        raw_results = list(executor.map(run_search, questions))
 
-    return {"search_results": search_results}
+    unique_results = []
+    seen_urls = set()
+
+    for search_result in raw_results:
+        if not isinstance(search_result, str):
+            continue
+
+        # Each search result may contain multiple articles.
+        current_result = []
+        current_url = None
+
+        for line in search_result.splitlines():
+            stripped_line = line.strip()
+
+            if stripped_line.startswith("Title:") or stripped_line.startswith("Title :"):
+                # Save the previous article before starting another.
+                if current_result and current_url:
+                    normalized = normalize_url(current_url)
+
+                    if normalized and normalized not in seen_urls:
+                        seen_urls.add(normalized)
+                        unique_results.append("\n".join(current_result))
+
+                current_result = [stripped_line]
+                current_url = None
+
+            elif stripped_line.startswith("URL:") or stripped_line.startswith("URL :"):
+                current_result.append(stripped_line)
+                current_url = stripped_line.split(":", 1)[1].strip()
+
+            elif current_result:
+                current_result.append(line)
+
+        # Save the final article in this search result.
+        if current_result and current_url:
+            normalized = normalize_url(current_url)
+
+            if normalized and normalized not in seen_urls:
+                seen_urls.add(normalized)
+                unique_results.append("\n".join(current_result))
+
+    print(f"Search questions processed: {len(questions)}")
+    print(f"Unique articles found: {len(unique_results)}")
+
+    return {"search_results": unique_results}
+
 
 def reader_node(state: ResearchState):
     print("\n--- READER NODE ---")
@@ -112,31 +213,64 @@ def reader_node(state: ResearchState):
     from tools import scrape_url
 
     articles = []
+    seen_urls = set()
 
-    print("Number of search results:", len(state["search_results"]))
-    print("First search result:")
-    print(state["search_results"][0])   
+    search_results = state.get("search_results", [])
 
-    for search_result in state["search_results"][:6]:
-        lines = search_result.splitlines()
+    print("Number of unique search results:", len(search_results))
 
-        for line in lines:
+    for search_result in search_results:
+        if not isinstance(search_result, str):
+            continue
+
+        url = None
+
+        for line in search_result.splitlines():
             line = line.strip()
 
-            if line.startswith("URL:"):
-                url = line.replace("URL:", "").strip()
+            if line.startswith("URL:") or line.startswith("URL :"):
+                url = line.split(":", 1)[1].strip()
+                break
 
-                print(f"\nReading: {url}")
+        if not url:
+            continue
 
-                content = scrape_url.invoke({
-                    "url": url
-                })
+        normalized = normalize_url(url)
 
-                articles.append(
-                    f"URL: {url}\nCONTENT:\n{content}"
-                )
+        if not normalized or normalized in seen_urls:
+            print(f"Skipping duplicate URL: {url}")
+            continue
+
+        seen_urls.add(normalized)
+
+        print(f"\nReading: {url}")
+
+        try:
+            content = scrape_url.invoke({"url": url})
+
+            if not isinstance(content, str):
+                content = str(content)
+
+            if not content.strip():
+                print(f"No content extracted from: {url}")
+                continue
+
+            if content.startswith("Could not scrape URL:"):
+                print(content)
+                continue
+
+            articles.append(
+                f"URL: {url}\n"
+                f"CONTENT:\n{content}"
+            )
+
+        except Exception as exc:
+            print(f"Could not read {url}: {exc}")
+
+    print(f"Unique articles successfully collected: {len(articles)}")
 
     return {"articles": articles}
+
 
 
 def gap_analysis_node(state: ResearchState):
@@ -236,20 +370,40 @@ def writer_node(state: ResearchState):
 
     # Retrieve PDF evidence only when the user enables it.
     if state.get("use_uploaded_docs", False):
-        query = state["topic"]
+        queries = [
+            state["topic"],
+            *state.get("research_questions", [])[:4],
+        ]
 
-        questions = state.get("research_questions", [])
-        if questions:
-            query += "\n" + "\n".join(questions)
+        pdf_passages = []
+        seen_passages = set()
 
-        pdf_passages = retrieve_context(query, top_k=5)
+        for query in queries:
+            passages = retrieve_context(
+                query,
+                top_k=3,
+                distance_threshold=0.65,
+            )
+
+            for passage in passages:
+                passage_key = (
+                    passage["document_id"],
+                    passage["page"],
+                    passage["text"],
+                )
+
+                if passage_key in seen_passages:
+                    continue
+
+                seen_passages.add(passage_key)
+                pdf_passages.append(passage)
 
         if pdf_passages:
             pdf_evidence = "\n\n".join(
                 (
                     f"PDF SOURCE: {item['filename']}, "
                     f"page {item['page']}\n"
-                    f"{item['text']}"
+                    f"CONTENT: {item['text']}"
                 )
                 for item in pdf_passages
             )
@@ -258,6 +412,7 @@ def writer_node(state: ResearchState):
                 "\n\nUPLOADED PDF EVIDENCE:\n"
                 + pdf_evidence
             )
+        
 
     critique = state.get("critique", "")
 

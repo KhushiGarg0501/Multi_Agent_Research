@@ -1,4 +1,3 @@
-
 from functools import lru_cache
 from hashlib import sha256
 from io import BytesIO
@@ -9,18 +8,20 @@ from pypdf import PdfReader
 from sentence_transformers import SentenceTransformer
 
 
-# --------------------------------------------------
+# ============================================================
 # CONFIGURATION
-# --------------------------------------------------
+# ============================================================
 
-DB_PATH = "./chroma_db"
+BASE_DIR = Path(__file__).resolve().parent
+DB_PATH = str(BASE_DIR / "chroma_db")
+
 COLLECTION_NAME = "research_pdf_chunks"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 
-# --------------------------------------------------
-# LOAD MODEL AND DATABASE ONCE
-# --------------------------------------------------
+# ============================================================
+# DATABASE AND EMBEDDING MODEL
+# ============================================================
 
 @lru_cache(maxsize=1)
 def get_embedding_model():
@@ -37,9 +38,9 @@ def get_collection():
     )
 
 
-# --------------------------------------------------
-# SPLIT TEXT INTO OVERLAPPING CHUNKS
-# --------------------------------------------------
+# ============================================================
+# SPLIT TEXT INTO CHUNKS
+# ============================================================
 
 def split_text(text, chunk_size=1000, overlap=150):
     text = " ".join(text.split())
@@ -53,7 +54,6 @@ def split_text(text, chunk_size=1000, overlap=150):
     while start < len(text):
         end = min(start + chunk_size, len(text))
 
-        # Prefer splitting at a word boundary.
         if end < len(text):
             boundary = text.rfind(" ", start, end)
 
@@ -73,9 +73,9 @@ def split_text(text, chunk_size=1000, overlap=150):
     return chunks
 
 
-# --------------------------------------------------
-# EXTRACT TEXT PAGE BY PAGE
-# --------------------------------------------------
+# ============================================================
+# EXTRACT PDF TEXT
+# ============================================================
 
 def extract_pdf_pages(pdf_bytes):
     reader = PdfReader(BytesIO(pdf_bytes))
@@ -93,11 +93,12 @@ def extract_pdf_pages(pdf_bytes):
     return pages
 
 
-# --------------------------------------------------
-# INDEX A PDF IN CHROMADB
-# --------------------------------------------------
+# ============================================================
+# INDEX PDF
+# ============================================================
 
 def index_pdf(filename, pdf_bytes):
+    filename = Path(filename).name
     document_id = sha256(pdf_bytes).hexdigest()
 
     pages = extract_pdf_pages(pdf_bytes)
@@ -108,35 +109,29 @@ def index_pdf(filename, pdf_bytes):
 
     for page_data in pages:
         page_number = page_data["page"]
-        chunks = split_text(page_data["text"])
 
-        for chunk_number, chunk in enumerate(chunks):
-            chunk_id = (
+        for chunk_number, chunk in enumerate(
+            split_text(page_data["text"])
+        ):
+            ids.append(
                 f"{document_id}_{page_number}_{chunk_number}"
             )
 
-            ids.append(chunk_id)
             documents.append(chunk)
 
             metadatas.append({
                 "document_id": document_id,
-                "filename": Path(filename).name,
+                "filename": filename,
                 "page": page_number,
             })
 
     if not documents:
         raise ValueError(
-            "No readable text was found in this PDF. "
-            "It may be a scanned PDF requiring OCR."
+            "No readable text was extracted from this PDF. "
+            "If the PDF contains scanned pages, OCR is required."
         )
 
-    # Replace previous chunks for the same PDF content.
     collection = get_collection()
-
-    collection.delete(
-        where={"document_id": document_id}
-    )
-
     model = get_embedding_model()
 
     embeddings = model.encode(
@@ -144,6 +139,11 @@ def index_pdf(filename, pdf_bytes):
         normalize_embeddings=True,
         show_progress_bar=False,
     ).tolist()
+
+    # Replace existing chunks for the same PDF content.
+    collection.delete(
+        where={"document_id": document_id}
+    )
 
     collection.add(
         ids=ids,
@@ -153,15 +153,16 @@ def index_pdf(filename, pdf_bytes):
     )
 
     return {
-        "filename": Path(filename).name,
+        "filename": filename,
         "chunks": len(documents),
         "document_id": document_id,
+        "total_chunks": collection.count(),
     }
 
 
-# --------------------------------------------------
+# ============================================================
 # LIST INDEXED DOCUMENTS
-# --------------------------------------------------
+# ============================================================
 
 def list_indexed_documents():
     collection = get_collection()
@@ -176,21 +177,25 @@ def list_indexed_documents():
         if not metadata:
             continue
 
-        document_id = metadata["document_id"]
+        document_id = metadata.get("document_id")
+        filename = metadata.get("filename")
 
-        documents[document_id] = metadata["filename"]
+        if document_id and filename:
+            documents[document_id] = filename
 
     return sorted(documents.values())
 
 
-# --------------------------------------------------
-# RETRIEVE RELEVANT PASSAGES
-# --------------------------------------------------
+# ============================================================
+# RETRIEVE PDF PASSAGES
+# ============================================================
 
 def retrieve_context(question, top_k=5):
     collection = get_collection()
 
-    if collection.count() == 0:
+    total_chunks = collection.count()
+
+    if total_chunks == 0:
         return []
 
     model = get_embedding_model()
@@ -203,51 +208,73 @@ def retrieve_context(question, top_k=5):
 
     results = collection.query(
         query_embeddings=query_embedding,
-        n_results=min(top_k, collection.count()),
-        include=["documents", "metadatas", "distances"],
+        n_results=min(top_k, total_chunks),
+        include=[
+            "documents",
+            "metadatas",
+            "distances",
+        ],
     )
 
     retrieved = []
 
+    result_documents = results.get("documents") or [[]]
+    result_metadatas = results.get("metadatas") or [[]]
+    result_distances = results.get("distances") or [[]]
+
     for document, metadata, distance in zip(
-        results["documents"][0],
-        results["metadatas"][0],
-        results["distances"][0],
+        result_documents[0],
+        result_metadatas[0],
+        result_distances[0],
     ):
+        if not document or not metadata:
+            continue
+
         retrieved.append({
             "text": document,
-            "filename": metadata["filename"],
-            "page": metadata["page"],
+            "filename": metadata.get(
+                "filename", "Unknown PDF"
+            ),
+            "page": metadata.get("page", "?"),
+            "document_id": metadata.get(
+                "document_id", ""
+            ),
             "distance": distance,
         })
 
     return retrieved
 
 
-# --------------------------------------------------
-# ANSWER QUESTIONS USING RETRIEVED PDF PASSAGES
-# --------------------------------------------------
+# ============================================================
+# ANSWER QUESTIONS USING PDF CONTENT
+# ============================================================
 
 def answer_question(question, top_k=5):
-    passages = retrieve_context(question, top_k=top_k)
+    question = question.strip()
+
+    if not question:
+        return "Please enter a question.", []
+
+    passages = retrieve_context(
+        question,
+        top_k=top_k,
+    )
 
     if not passages:
         return (
             "No indexed PDF passages were found. "
-            "Upload and index a PDF first.",
+            "Please upload and index a PDF first.",
             [],
         )
 
-    context_parts = []
-
-    for passage in passages:
-        context_parts.append(
+    context = "\n\n---\n\n".join(
+        (
             f"Source: {passage['filename']}, "
             f"page {passage['page']}\n"
             f"{passage['text']}"
         )
-
-    context = "\n\n---\n\n".join(context_parts)
+        for passage in passages
+    )
 
     prompt = f"""
 You are a document question-answering assistant.
@@ -256,10 +283,11 @@ Answer the user's question using the provided PDF passages.
 
 Rules:
 1. Base factual claims on the provided passages.
-2. Cite sources inline using [filename, p. X].
-3. If the passages do not contain enough information, say so.
+2. Cite supporting claims as [filename, p. X].
+3. If the passages do not contain enough information,
+   clearly state that.
 4. Do not invent facts, quotations, page numbers, or sources.
-5. You may explain the retrieved information in clear language.
+5. Explain the findings clearly and directly.
 
 PDF PASSAGES:
 {context}
@@ -268,13 +296,11 @@ USER QUESTION:
 {question}
 """
 
-    # Reuse the Gemini model configured in agents.py.
     from agents import llm
 
     response = llm.invoke(prompt)
     answer = response.content
 
-    # Handle text responses returned as a list of blocks.
     if isinstance(answer, list):
         answer = "\n".join(
             block.get("text", "")
@@ -287,6 +313,8 @@ USER QUESTION:
         {
             "filename": passage["filename"],
             "page": passage["page"],
+            "text": passage["text"],
+            "distance": passage["distance"],
         }
         for passage in passages
     ]
