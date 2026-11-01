@@ -1,3 +1,8 @@
+const supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY
+);
+
 console.log("RESEARCHLY SCRIPT LOADED");
 
 window.addEventListener("beforeunload", () => {
@@ -10,6 +15,87 @@ const $$ = (selector, root=document) => [...root.querySelectorAll(selector)];
 let currentTopic = "";
 let currentReport = "";
 let isDemoSignedIn = false;
+let currentUser = null;
+
+// Check the existing session when Researchly loads
+async function checkAuthSession() {
+    try {
+        const { data, error } = await supabaseClient.auth.getSession();
+
+        if (error) throw error;
+
+        currentUser = data.session?.user || null;
+        isDemoSignedIn = !!currentUser;
+
+        updateAuthUI();
+
+        console.log("Authentication initialized:", currentUser?.email || "Guest");
+    } catch (error) {
+        console.error("Authentication initialization failed:", error);
+    }
+}
+
+// Listen for login, logout and session changes
+supabaseClient.auth.onAuthStateChange((event, session) => {
+    currentUser = session?.user || null;
+    isDemoSignedIn = !!currentUser;
+
+    updateAuthUI();
+});
+
+// Update the visible interface
+function updateAuthUI() {
+    const loggedIn = !!currentUser;
+
+    // Homepage buttons
+    $("#header-login").classList.toggle("hidden", loggedIn);
+    $("#header-signup").classList.toggle("hidden", loggedIn);
+    $("#header-account").classList.toggle("hidden", !loggedIn);
+    $("#header-logout").classList.toggle("hidden", !loggedIn);
+
+    // Workspace profile
+    const profile = $(".sidebar-profile");
+
+    if (profile) {
+        if (loggedIn) {
+            profile.innerHTML = `
+                <span class="profile-avatar">👤</span>
+                <span>
+                    <b>${escapeHTML(currentUser.email)}</b>
+                    <small>My account</small>
+                </span>
+                <span class="profile-arrow">↗</span>
+            `;
+        } else {
+            profile.innerHTML = `
+                <span class="profile-avatar">G</span>
+                <span>
+                    <b>Guest workspace</b>
+                    <small>Sign in to save your work</small>
+                </span>
+                <span class="profile-arrow">↗</span>
+            `;
+        }
+    }
+
+    // Workspace status
+    const secureNote = $(".secure-note");
+
+    if (secureNote) {
+        secureNote.innerHTML = loggedIn
+            ? "<i></i> Signed in"
+            : "<i></i> Guest session";
+    }
+
+    // Account details
+    if (loggedIn) {
+        $("#account-email").textContent = currentUser.email;
+    }
+}
+
+// Run on page load
+checkAuthSession();
+
 let researchMode = "web";
 let attachedPDFs = [];
 const API_BASE = "http://127.0.0.1:8000";
@@ -228,7 +314,9 @@ $("#hero-start").addEventListener("click", openWorkspace);
 $("#workflow-start").addEventListener("click", openWorkspace);
 $("#bottom-start").addEventListener("click", openWorkspace);
 $$("[data-home]").forEach(el=>el.addEventListener("click", event=>{event.preventDefault();goHome()}));
-$$("[data-auth]").forEach(el=>el.addEventListener("click", ()=>openAuth(el.dataset.auth)));
+$$("[data-auth]:not(.sidebar-profile)").forEach(el => {
+    el.addEventListener("click", () => openAuth(el.dataset.auth));
+});
 $("#research-form").addEventListener("submit", event=>{event.preventDefault();runResearch($("#research-input").value)});
 $$("[data-prompt]").forEach(el=>el.addEventListener("click", ()=>runResearch(el.dataset.prompt)));
 $("#new-chat").addEventListener("click", ()=>{
@@ -242,8 +330,23 @@ $("#new-chat").addEventListener("click", ()=>{
 });
 $("#modal-close").addEventListener("click", closeAuth);
 $("#auth-modal").addEventListener("click", event=>{if(event.target === $("#auth-modal")) closeAuth()});
-$("#google-demo").addEventListener("click", ()=>{
-  showToast("Google sign-in will be connected during the authentication stage.");
+$("#google-demo").addEventListener("click", async () => {
+    try {
+        const { data, error } = await supabaseClient.auth.signInWithOAuth({
+            provider: "google",
+            options: {
+                redirectTo: window.location.origin
+            }
+        });
+
+        if (error) {
+            console.error("Google sign-in error:", error);
+            showToast(error.message);
+        }
+    } catch (error) {
+        console.error(error);
+        showToast("Unable to sign in. Please try again.");
+    }
 });
 $("#email-demo").addEventListener("click", ()=>{
   showToast("Account creation will be connected during the authentication stage.");
@@ -396,3 +499,54 @@ $("#pdf-upload").addEventListener("change", async event => {
 $("#research-input").addEventListener("keydown", event=>{
   if(event.key === "Enter" && !event.shiftKey){event.preventDefault();$("#research-form").requestSubmit()}
 });
+
+
+document.addEventListener("DOMContentLoaded", () => {
+    checkAuthSession();
+});
+
+
+// Open account modal
+function openAccount() {
+    if (!currentUser) {
+        openAuth("login");
+        return;
+    }
+
+    $("#account-modal").classList.remove("hidden");
+}
+
+// Close account modal
+$("#account-close").addEventListener("click", () => {
+    $("#account-modal").classList.add("hidden");
+});
+
+// Homepage account button
+$("#header-account").addEventListener("click", openAccount);
+
+// Workspace profile button
+$(".sidebar-profile").addEventListener("click", openAccount);
+
+// Logout function
+async function logoutUser() {
+    const { error } = await supabaseClient.auth.signOut();
+
+    if (error) {
+        showToast(error.message);
+        return;
+    }
+
+    currentUser = null;
+    isDemoSignedIn = false;
+
+    updateAuthUI();
+
+    $("#account-modal").classList.add("hidden");
+    closeAuth();
+
+    showToast("You have been logged out successfully.");
+}
+
+// Logout buttons
+$("#header-logout").addEventListener("click", logoutUser);
+$("#account-logout").addEventListener("click", logoutUser);

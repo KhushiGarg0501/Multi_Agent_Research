@@ -205,11 +205,14 @@ def retrieve_context(
             "document_id": {"$in": document_ids}
         }
 
-    total_chunks = (
-        collection.count(where=where)
-        if where
-        else collection.count()
-    )
+    if where:
+        filtered_results = collection.get(
+            where=where,
+            include=[]
+        )
+        total_chunks = len(filtered_results["ids"])
+    else:
+        total_chunks = collection.count()
 
     if total_chunks == 0:
         return []

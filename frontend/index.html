@@ -25,11 +25,25 @@
       <a href="#how-it-works">How it works</a>
       <a href="#agents">Our agents</a>
     </nav>
-    <div class="header-actions">
-      <button class="button button-ghost sign-in-trigger" data-auth="login">Log in</button>
-      <button class="button button-small button-primary" data-auth="signup">Get started <span aria-hidden="true">↗</span></button>
-      <button class="mobile-menu" aria-label="Open menu" aria-expanded="false"><span></span><span></span></button>
-    </div>
+<div class="header-actions">
+  <button class="button button-ghost sign-in-trigger" id="header-login" data-auth="login">Log in</button>
+
+  <button class="button button-small button-primary" id="header-signup" data-auth="signup">
+    Get started <span aria-hidden="true">↗</span>
+  </button>
+
+  <button class="button button-ghost hidden" id="header-account">
+    My Account
+  </button>
+
+  <button class="button button-small button-primary hidden" id="header-logout">
+    Log out
+  </button>
+
+  <button class="mobile-menu" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span>
+  </button>
+</div>
   </header>
 
   <main id="home-view">
@@ -131,7 +145,8 @@
       <button class="sidebar-profile" data-auth="login"><span class="profile-avatar">G</span><span><b>Guest workspace</b><small>Sign in to save your work</small></span><span class="profile-arrow">↗</span></button>
     </aside>
     <section class="workspace-main">
-      <div class="workspace-topbar"><button class="mobile-back" data-home>← Home</button><div class="breadcrumb">Workspace <span>/</span> <b>New research</b></div><div class="workspace-top-actions"><span class="secure-note"><i></i> Guest session</span><button class="button button-ghost" data-auth="login">Log in</button></div></div>
+      <div class="workspace-topbar"><button class="mobile-back" data-home>← Home</button><div class="breadcrumb">Workspace <span>/</span> <b>New research</b>
+      </div><div class="workspace-top-actions"><span class="secure-note"><i></i> Guest session</span></div></div>
       <div class="chat-area" id="chat-area">
         <div class="chat-welcome" id="chat-welcome">
           <div class="welcome-orb"><span>✦</span></div>
@@ -191,7 +206,26 @@
       <div class="demo-note">UI preview only — Google authentication will be connected in a later step.</div>
     </div>
   </div>
+
+  <!-- Account Modal -->
+<div class="modal-backdrop hidden" id="account-modal">
+    <div class="auth-modal">
+        <button class="modal-close" id="account-close">×</button>
+
+        <div class="auth-orb">👤</div>
+        <div class="eyebrow">YOUR RESEARCHLY ACCOUNT</div>
+        <h2>Welcome back!</h2>
+        <p id="account-email"></p>
+
+        <button class="button button-primary" id="account-logout">
+            Log out
+        </button>
+    </div>
+</div>
   <div class="toast" id="toast" role="status"></div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
