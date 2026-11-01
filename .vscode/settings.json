@@ -1,0 +1,11 @@
+{
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+
+    "liveServer.settings.ignoreFiles": [
+        "**/.git/**",
+        "**/venv/**",
+        "**/chroma_db/**",
+        "**/__pycache__/**",
+        "**/.pytest_cache/**"
+    ]
+}

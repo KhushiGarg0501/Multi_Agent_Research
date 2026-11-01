@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b1020" />
+  <meta name="description" content="An AI-powered multi-agent research assistant that turns complex questions into structured research." />
+  <title>Researchly — Think deeper. Research smarter.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <header class="site-header">
+    <a class="brand" href="#" aria-label="Researchly home" data-home>
+      <span class="brand-mark"><span></span><span></span><span></span></span>
+      <span>research<span class="brand-accent">ly</span></span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="#features">Features</a>
+      <a href="#how-it-works">How it works</a>
+      <a href="#agents">Our agents</a>
+    </nav>
+    <div class="header-actions">
+      <button class="button button-ghost sign-in-trigger" data-auth="login">Log in</button>
+      <button class="button button-small button-primary" data-auth="signup">Get started <span aria-hidden="true">↗</span></button>
+      <button class="mobile-menu" aria-label="Open menu" aria-expanded="false"><span></span><span></span></button>
+    </div>
+  </header>
+
+  <main id="home-view">
+    <section class="hero section-shell">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="eyebrow-pulse"></span> YOUR RESEARCH, REIMAGINED</div>
+        <h1>Think deeper.<br><span class="gradient-text">Research smarter.</span></h1>
+        <p class="hero-description">From a big question to a well-structured report. Let a team of AI research agents explore, analyse and bring the important insights together.</p>
+        <div class="hero-cta-row">
+          <button class="button button-primary button-large" id="hero-start">Start researching <span aria-hidden="true">↗</span></button>
+          <a class="text-link" href="#how-it-works"><span class="play-icon">▶</span> See how it works</a>
+        </div>
+        <div class="hero-proof">
+          <div class="avatar-stack"><span>R</span><span>A</span><span>M</span><span>+</span></div>
+          <div><strong>One question. Multiple perspectives.</strong><small>Research powered by a coordinated AI team</small></div>
+        </div>
+      </div>
+
+      <div class="hero-visual" aria-label="Research workspace preview">
+        <div class="visual-orbit orbit-a"></div><div class="visual-orbit orbit-b"></div>
+        <div class="preview-window">
+          <div class="preview-topbar"><div class="window-dots"><i></i><i></i><i></i></div><span>RESEARCH WORKSPACE</span><span class="preview-live"><b></b> LIVE PREVIEW</span></div>
+          <div class="preview-content">
+            <div class="preview-label">YOUR RESEARCH BRIEF</div>
+            <h3>How is AI transforming<br>the future of healthcare?</h3>
+            <div class="preview-tags"><span>Technology</span><span>Healthcare</span><span>2026 outlook</span></div>
+            <div class="preview-divider"></div>
+            <div class="preview-progress-head"><span>Research in progress</span><strong>82%</strong></div>
+            <div class="progress-track"><span></span></div>
+            <div class="mini-agent-list">
+              <div class="mini-agent"><span class="mini-icon purple">⌕</span><span><b>Planner</b><small>Research questions mapped</small></span><em>Complete</em></div>
+              <div class="mini-agent"><span class="mini-icon blue">◎</span><span><b>Search agent</b><small>Exploring trusted sources</small></span><em>Complete</em></div>
+              <div class="mini-agent"><span class="mini-icon teal">▤</span><span><b>Reader agent</b><small>Extracting key insights</small></span><em class="working">Working</em></div>
+              <div class="mini-agent faded"><span class="mini-icon orange">✎</span><span><b>Writer agent</b><small>Building your report</small></span><em>Queued</em></div>
+            </div>
+          </div>
+          <div class="preview-foot"><span><i></i> 5 specialised agents collaborating</span><span>Just a preview</span></div>
+        </div>
+        <div class="floating-note note-top"><span class="note-spark">✦</span><span><b>More than a chatbot</b><small>A complete research workflow</small></span></div>
+        <div class="floating-note note-bottom"><span class="note-check">✓</span><span><b>Structured insights</b><small>From question to report</small></span></div>
+      </div>
+    </section>
+
+    <section class="trust-strip section-shell">
+      <span>BUILT FOR CURIOUS MINDS</span><i></i><span>ACADEMIC RESEARCH</span><i></i><span>INDUSTRY ANALYSIS</span><i></i><span>DEEP-DIVE EXPLORATION</span>
+    </section>
+
+    <section class="features-section section-shell" id="features">
+      <div class="section-heading">
+        <div class="eyebrow">A BETTER WAY TO FIND ANSWERS</div>
+        <h2>Research that goes<br><span class="muted-gradient">beyond the surface.</span></h2>
+        <p>Bring the speed of AI together with a structured research process, so you can spend less time searching and more time understanding.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card feature-card-large">
+          <div class="feature-icon violet">⌕</div><div class="feature-kicker">01 / DISCOVER</div>
+          <h3>Explore from every angle</h3><p>Turn a broad topic into focused research questions and explore relevant information from across the web.</p>
+          <div class="feature-illustration search-illustration"><span class="search-line long"></span><span class="search-line"></span><span class="search-line short"></span><b>⌕</b></div>
+        </article>
+        <article class="feature-card">
+          <div class="feature-icon blue">▤</div><div class="feature-kicker">02 / UNDERSTAND</div>
+          <h3>Find what matters</h3><p>Relevant pages are read and key information is brought together into a clearer picture.</p>
+          <div class="stack-illustration"><span></span><span></span><span></span></div>
+        </article>
+        <article class="feature-card">
+          <div class="feature-icon mint">✧</div><div class="feature-kicker">03 / CREATE</div>
+          <h3>Get a structured report</h3><p>Receive a coherent research report, not just a collection of disconnected search results.</p>
+          <div class="report-illustration"><b></b><i></i><i></i><i></i><i></i></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="workflow-section" id="how-it-works">
+      <div class="section-shell workflow-inner">
+        <div class="workflow-copy"><div class="eyebrow">A TEAM THAT THINKS TOGETHER</div><h2>Five agents.<br><span class="gradient-text">One clear outcome.</span></h2><p>Each agent has a role in the research journey. Together, they help transform your question into a thoughtful, reviewed report.</p><button class="button button-primary" id="workflow-start">Try the research workspace <span>↗</span></button></div>
+        <div class="workflow-steps">
+          <div class="workflow-step"><span class="step-number">01</span><span class="step-symbol purple">⌖</span><div><h3>Planner</h3><p>Breaks your topic into useful research questions.</p></div><span class="step-status">PLAN</span></div>
+          <div class="workflow-step"><span class="step-number">02</span><span class="step-symbol blue">◎</span><div><h3>Search</h3><p>Finds relevant information and sources on the web.</p></div><span class="step-status">DISCOVER</span></div>
+          <div class="workflow-step"><span class="step-number">03</span><span class="step-symbol teal">▤</span><div><h3>Reader</h3><p>Reads selected pages and extracts useful details.</p></div><span class="step-status">ANALYSE</span></div>
+          <div class="workflow-step"><span class="step-number">04</span><span class="step-symbol orange">✎</span><div><h3>Writer</h3><p>Combines the findings into a structured report.</p></div><span class="step-status">CREATE</span></div>
+          <div class="workflow-step"><span class="step-number">05</span><span class="step-symbol pink">◇</span><div><h3>Critic</h3><p>Reviews the report and suggests improvements.</p></div><span class="step-status">REFINE</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="agents-section section-shell" id="agents">
+      <div class="agents-banner"><div><div class="eyebrow">YOUR RESEARCH TEAM IS READY</div><h2>Big questions deserve<br>better research.</h2><p>Start with a question. See where a coordinated research process can take it.</p></div><button class="button button-light button-large" id="bottom-start">Start for free <span>↗</span></button><div class="banner-glow"></div></div>
+    </section>
+  </main>
+
+  <main id="workspace-view" class="workspace-view hidden">
+    <aside class="workspace-sidebar">
+      <a class="brand sidebar-brand" href="#" data-home><span class="brand-mark"><span></span><span></span><span></span></span><span>research<span class="brand-accent">ly</span></span></a>
+      <button class="button button-new-chat" id="new-chat"><span>＋</span> New research</button>
+      <div class="sidebar-caption">WORKSPACE</div>
+      <button class="sidebar-link active"><span>◈</span> Current research</button>
+      <div class="sidebar-spacer"></div>
+      <div class="sidebar-help"><span class="help-icon">✦</span><b>Research, made clearer.</b><p>Your AI research team is ready when you are.</p></div>
+      <button class="sidebar-profile" data-auth="login"><span class="profile-avatar">G</span><span><b>Guest workspace</b><small>Sign in to save your work</small></span><span class="profile-arrow">↗</span></button>
+    </aside>
+    <section class="workspace-main">
+      <div class="workspace-topbar"><button class="mobile-back" data-home>← Home</button><div class="breadcrumb">Workspace <span>/</span> <b>New research</b></div><div class="workspace-top-actions"><span class="secure-note"><i></i> Guest session</span><button class="button button-ghost" data-auth="login">Log in</button></div></div>
+      <div class="chat-area" id="chat-area">
+        <div class="chat-welcome" id="chat-welcome">
+          <div class="welcome-orb"><span>✦</span></div>
+          <div class="eyebrow">YOUR AI RESEARCH TEAM</div>
+          <h1>What would you like<br>to <span class="gradient-text">discover today?</span></h1>
+          <p>Ask a question, explore a topic or start with one of the suggestions below.</p>
+          <div class="suggestion-grid">
+            <button class="suggestion-card" data-prompt="How is generative AI changing software engineering?"><span class="suggestion-icon purple">✧</span><b>Technology trends</b><small>How is generative AI changing software engineering?</small><span class="suggestion-arrow">↗</span></button>
+            <button class="suggestion-card" data-prompt="What are the opportunities and challenges of renewable energy?"><span class="suggestion-icon mint">◉</span><b>Explore an industry</b><small>Opportunities and challenges in renewable energy</small><span class="suggestion-arrow">↗</span></button>
+            <button class="suggestion-card" data-prompt="What does recent research say about the future of education?"><span class="suggestion-icon blue">⌑</span><b>Academic research</b><small>What does recent research say about the future of education?</small><span class="suggestion-arrow">↗</span></button>
+          </div>
+        </div>
+        <div id="conversation" class="conversation"></div>
+      </div>
+      <div class="composer-wrap">
+        <form class="composer" id="research-form">
+          <div class="research-mode-row" role="group" aria-label="Research mode">
+            <button type="button" class="mode-button active" data-mode="web" aria-pressed="true"><span>◎</span> Web Search</button>
+            <button type="button" class="mode-button" data-mode="pdf" aria-pressed="false"><span>▤</span> Ask My PDFs</button>
+            <button type="button" class="mode-button" data-mode="combined" aria-pressed="false"><span>✧</span> Web + PDFs</button>
+          </div>
+          <textarea id="research-input" rows="1" placeholder="Ask anything you want to research..." aria-label="Research topic"></textarea>
+          <div id="attached-files" class="attached-files hidden" aria-live="polite"></div>
+          
+          <div class="composer-bottom">
+            <div class="composer-tools">
+              <button type="button" class="attach-button" id="attach-pdf" aria-label="Attach PDF" title="Add PDFs"><span>＋</span></button>
+              <span class="composer-mode-label" id="composer-mode-label"><span class="composer-spark">✦</span> Web research</span>
+            </div>
+            <button type="submit" class="send-button" aria-label="Start research">↑</button>
+          </div>
+        </form>
+        <input
+        id="pdf-upload"
+        type="file"
+        accept=".pdf,application/pdf"
+        multiple
+        hidden
+      >
+        <p class="composer-disclaimer">Researchly can make mistakes. Review important information and sources.</p>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop hidden" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <div class="auth-modal">
+      <button class="modal-close" aria-label="Close dialog" id="modal-close">×</button>
+      <a class="brand modal-brand" href="#" data-home><span class="brand-mark"><span></span><span></span><span></span></span><span>research<span class="brand-accent">ly</span></span></a>
+      <div class="auth-orb">✦</div>
+      <div class="eyebrow">YOUR RESEARCH, SAVED</div>
+      <h2 id="auth-title">Continue your<br><span class="gradient-text">research journey.</span></h2>
+      <p id="auth-description">Sign in to save your conversations and download your research reports.</p>
+      <button class="button google-button" id="google-demo"><span class="google-g">G</span> Continue with Google</button>
+      <div class="auth-divider"><span>or</span></div>
+      <button class="button button-primary auth-email-button" id="email-demo">Continue with email</button>
+      <small class="auth-terms">By continuing, you agree to our Terms of Service and Privacy Policy.</small>
+      <div class="demo-note">UI preview only — Google authentication will be connected in a later step.</div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="script.js"></script>
+</body>
+</html>

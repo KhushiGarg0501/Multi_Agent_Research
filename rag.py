@@ -190,10 +190,26 @@ def list_indexed_documents():
 # RETRIEVE PDF PASSAGES
 # ============================================================
 
-def retrieve_context(question, top_k=5):
+def retrieve_context(
+    question,
+    top_k=5,
+    distance_threshold=None,
+    document_ids=None,
+):
     collection = get_collection()
 
-    total_chunks = collection.count()
+    where = None
+
+    if document_ids:
+        where = {
+            "document_id": {"$in": document_ids}
+        }
+
+    total_chunks = (
+        collection.count(where=where)
+        if where
+        else collection.count()
+    )
 
     if total_chunks == 0:
         return []
@@ -209,6 +225,7 @@ def retrieve_context(question, top_k=5):
     results = collection.query(
         query_embeddings=query_embedding,
         n_results=min(top_k, total_chunks),
+        where=where,
         include=[
             "documents",
             "metadatas",
@@ -230,26 +247,27 @@ def retrieve_context(question, top_k=5):
         if not document or not metadata:
             continue
 
+        if (
+            distance_threshold is not None
+            and distance > distance_threshold
+        ):
+            continue
+
         retrieved.append({
             "text": document,
-            "filename": metadata.get(
-                "filename", "Unknown PDF"
-            ),
+            "filename": metadata.get("filename", "Unknown PDF"),
             "page": metadata.get("page", "?"),
-            "document_id": metadata.get(
-                "document_id", ""
-            ),
+            "document_id": metadata.get("document_id", ""),
             "distance": distance,
         })
 
     return retrieved
 
-
 # ============================================================
 # ANSWER QUESTIONS USING PDF CONTENT
 # ============================================================
 
-def answer_question(question, top_k=5):
+def answer_question(question, top_k=5,document_ids =None,):
     question = question.strip()
 
     if not question:
@@ -258,6 +276,7 @@ def answer_question(question, top_k=5):
     passages = retrieve_context(
         question,
         top_k=top_k,
+        document_ids =document_ids,
     )
 
     if not passages:

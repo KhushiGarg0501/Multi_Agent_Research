@@ -19,6 +19,7 @@ class ResearchState(TypedDict):
     research_gaps: str
     fact_check: str
     use_uploaded_docs: bool
+    selected_document_ids: list[str]
 
 def normalize_url(url: str) -> str:
     """Normalize URLs so equivalent links can be identified as duplicates."""
@@ -383,6 +384,7 @@ def writer_node(state: ResearchState):
                 query,
                 top_k=3,
                 distance_threshold=0.65,
+                document_ids=state.get("selected_document_ids"),
             )
 
             for passage in passages:

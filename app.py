@@ -168,7 +168,7 @@ st.markdown("""
     color: var(--ink);
     overflow-x: hidden;
 }
-#MainMenu, footer,  { visibility: hidden; }
+#MainMenu, footer, header { visibility: hidden; }
 .block-container {
     width: 100%;
     max-width: 1180px;
@@ -287,38 +287,7 @@ hr { border-color: #e2e8f0; margin: 1.3rem 0; }
 </style>
 """, unsafe_allow_html=True)
 
-
-# ================= GOOGLE AUTHENTICATION =================
-
-if not st.user.is_logged_in:
-    st.title("🧠 MultiAgent Research System")
-    st.markdown("### Welcome!")
-    st.write("Sign in with your Google account to access the research system.")
-
-    st.button(
-        "Continue with Google",
-        on_click=st.login,
-        type="primary",
-        use_container_width=True,
-    )
-
-    st.stop()
-
-
-
-# ================= EXISTING RESEARCH SIDEBAR =================
-
-
 with st.sidebar:
-    st.markdown("### 👤 Your Account")
-    st.write(f"**Name:** {st.user.name}")
-    st.caption(st.user.email)
-
-    if st.button("🚪 Logout", use_container_width=True):
-        st.logout()
-
-    st.divider()
-
     st.markdown("## ⚙️ Research Settings")
     st.markdown("""<div style="background:white;padding:18px;border-radius:14px;border:1px solid #e2e8f0;">
     <b>Multi-Agent Research</b><br><br>Plan, search, read, synthesize and critique research, or ask questions about your own PDFs.
