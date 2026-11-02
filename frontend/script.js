@@ -17,6 +17,240 @@ let currentReport = "";
 let isDemoSignedIn = false;
 let currentUser = null;
 
+// Save completed research to the logged-in user's history
+async function saveResearchHistory(topic, mode, report, sources = []) {
+    if (!currentUser) {
+        console.log("Guest research: history not saved.");
+        return;
+    }
+
+    try {
+        const { data, error } = await supabaseClient
+            .from("research_history")
+            .insert([
+                {
+                    user_id: currentUser.id,
+                    topic: topic,
+                    mode: mode,
+                    report: report,
+                    sources: sources
+                }
+            ])
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        console.log("Research history saved:", data.id);
+
+        showToast("Research saved to your history!");
+
+        loadResearchHistory();
+
+    } catch (error) {
+        console.error("History saving failed:", error);
+        showToast("Research completed, but history could not be saved.");
+    }
+}
+
+// Load the logged-in user's research history
+async function loadResearchHistory() {
+    const historyList = document.getElementById("research-history-list");
+
+    if (!historyList) return;
+
+    if (!currentUser) {
+        historyList.innerHTML =
+            '<p class="history-empty">Sign in to view your research history.</p>';
+        return;
+    }
+
+    historyList.innerHTML =
+        '<p class="history-empty">Loading history...</p>';
+
+    try {
+        const { data, error } = await supabaseClient
+            .from("research_history")
+            .select("*")
+            .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        historyList.innerHTML = "";
+
+        if (!data || data.length === 0) {
+            historyList.innerHTML =
+                '<p class="history-empty">No saved research yet.</p>';
+            return;
+        }
+
+        // Group research history by date
+const groups = {
+    "Today": [],
+    "Yesterday": [],
+    "Previous 7 Days": [],
+    "Older": []
+};
+
+const now = new Date();
+
+const todayValue = Date.UTC(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+);
+
+data.forEach(item => {
+    const date = new Date(item.created_at);
+
+    const itemValue = Date.UTC(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate()
+    );
+
+    const daysAgo = Math.floor(
+        (todayValue - itemValue) / 86400000
+    );
+
+    if (daysAgo <= 0) {
+        groups["Today"].push(item);
+    } else if (daysAgo === 1) {
+        groups["Yesterday"].push(item);
+    } else if (daysAgo <= 7) {
+        groups["Previous 7 Days"].push(item);
+    } else {
+        groups["Older"].push(item);
+    }
+});
+
+// Display each date group
+Object.entries(groups).forEach(([groupName, items]) => {
+
+    if (items.length === 0) return;
+
+    const section = document.createElement("div");
+    section.className = "history-date-group";
+
+    const heading = document.createElement("div");
+    heading.className = "history-date-heading";
+    heading.textContent = groupName;
+
+    section.appendChild(heading);
+
+    items.forEach(item => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "history-item-wrapper";
+
+        const button = document.createElement("button");
+        button.className = "history-item";
+        button.textContent = item.topic;
+        button.title = item.topic;
+
+        button.addEventListener("click", () => {
+            openHistoryReport(item);
+        });
+
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "history-delete";
+        deleteButton.textContent = "×";
+        deleteButton.title = "Delete this research";
+
+        deleteButton.addEventListener("click", async (event) => {
+            event.stopPropagation();
+            await deleteResearchHistory(item.id);
+        });
+
+        wrapper.append(button, deleteButton);
+        section.appendChild(wrapper);
+    });
+
+    historyList.appendChild(section);
+});
+                
+
+    } catch (error) {
+        console.error("History loading failed:", error);
+
+        historyList.innerHTML =
+            '<p class="history-empty">Unable to load history.</p>';
+    }
+}
+
+// Delete a saved research record
+async function deleteResearchHistory(id) {
+    const confirmed = confirm(
+        "Are you sure you want to delete this research?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+        const { error } = await supabaseClient
+            .from("research_history")
+            .delete()
+            .eq("id", id);
+
+        if (error) throw error;
+
+        showToast("Research deleted successfully!");
+
+        await loadResearchHistory();
+
+    } catch (error) {
+        console.error("History deletion failed:", error);
+        showToast("Unable to delete research.");
+    }
+}
+
+// Open a previously saved research report
+function openHistoryReport(item) {
+    currentTopic = item.topic;
+    currentReport = item.report;
+
+    $("#home-view").classList.add("hidden");
+    $("#workspace-view").classList.remove("hidden");
+
+    $("#chat-welcome").classList.add("hidden");
+    $("#conversation").innerHTML = "";
+
+    addMessage("user", item.topic);
+
+    const reportHTML = escapeHTML(item.report);
+
+    addMessage(
+        "assistant",
+        `
+        <div class="mock-report">
+            <div class="report-meta">
+                RESEARCHLY · SAVED REPORT
+            </div>
+
+            <h3>${escapeHTML(item.topic)}</h3>
+
+            <div class="report-content"
+                 style="white-space:pre-wrap;line-height:1.7">
+                ${reportHTML}
+            </div>
+
+            <div class="report-meta">
+                Saved on ${new Date(item.created_at).toLocaleString()}
+            </div>
+
+            <div class="report-actions">
+                <button class="download-action" id="download-report">
+                    ↓ Download report
+                </button>
+            </div>
+        </div>
+        `
+    );
+
+    $("#download-report").addEventListener("click", downloadReport);
+
+    $("#chat-area").scrollTop = $("#chat-area").scrollHeight;
+}
+
 // Check the existing session when Researchly loads
 async function checkAuthSession() {
     try {
@@ -28,6 +262,7 @@ async function checkAuthSession() {
         isDemoSignedIn = !!currentUser;
 
         updateAuthUI();
+        loadResearchHistory();
 
         console.log("Authentication initialized:", currentUser?.email || "Guest");
     } catch (error) {
@@ -41,6 +276,7 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
     isDemoSignedIn = !!currentUser;
 
     updateAuthUI();
+    loadResearchHistory();
 });
 
 // Update the visible interface
@@ -238,6 +474,13 @@ async function runResearch(topic) {
     }
 
     currentReport = resultText;
+
+    await saveResearchHistory(
+        clean,
+        apiModes[researchMode],
+        resultText,
+        data.sources || []
+    );
 
     const safeResult = escapeHTML(resultText);
 
