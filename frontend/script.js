@@ -162,7 +162,7 @@ function createPreviewReport(topic){
 <button class="download-action" id="download-docx">
   ↓ Download Word
 </button>
-  <button id="save-chat">＋ Save conversation</button></div></div>`;
+  </div></div>`;
 }
 async function runResearch(topic) {
   const clean = topic.trim();
@@ -288,7 +288,6 @@ const formattedResult = DOMPurify.sanitize(
         ↓ Download Word
     </button>
 
-    <button id="save-chat">＋ Save conversation</button>
 </div>
       </div>
     `;
@@ -296,7 +295,7 @@ const formattedResult = DOMPurify.sanitize(
     $("#download-pdf").addEventListener("click", () => downloadReport("pdf"));
 $("#download-docx").addEventListener("click", () => downloadReport("docx"));
 
-    $("#save-chat").addEventListener("click", () => openAuth("signup"));
+  
 
     $("#chat-area").scrollTop = $("#chat-area").scrollHeight;
 
