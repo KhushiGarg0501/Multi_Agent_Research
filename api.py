@@ -8,6 +8,24 @@ from pydantic import BaseModel
 from graph import graph
 from rag import index_pdf, answer_question, get_collection
 
+from io import BytesIO
+from fastapi.responses import StreamingResponse
+
+from docx import Document
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    HRFlowable
+)
+
+from xml.sax.saxutils import escape
+import re
 
 app = FastAPI(title="Researchly API")
 
@@ -29,6 +47,9 @@ class ResearchRequest(BaseModel):
     mode: Literal["web_search", "ask_pdfs", "combined"]
     selected_document_ids: list[str] = []
 
+class ExportRequest(BaseModel):
+    topic: str
+    report: str
 
 @app.get("/api/health")
 def health():
@@ -178,3 +199,192 @@ def research(request: ResearchRequest):
             status_code=500,
             detail=f"Research failed: {str(exc)}"
         )
+
+def clean_markdown(text: str) -> str:
+    """Clean Markdown formatting for Word export."""
+    text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+    text = re.sub(r"!\[.*?\]\(.*?\)", "", text)
+    text = re.sub(r"\[(.*?)\]\((.*?)\)", r"\1", text)
+    text = re.sub(r"(\*\*|__)(.*?)\1", r"\2", text)
+    text = re.sub(r"(\*|_)(.*?)\1", r"\2", text)
+    text = re.sub(r"`(.*?)`", r"\1", text)
+
+    return text.strip()
+
+
+@app.post("/api/export/docx")
+async def export_docx(request: ExportRequest):
+
+    document = Document()
+
+    # Document title
+    document.add_heading("Research Report", 0)
+    document.add_heading(request.topic, level=1)
+
+    # Process report content
+    for line in request.report.splitlines():
+
+        line = line.strip()
+
+        if not line:
+            continue
+
+        if line.startswith("### "):
+            document.add_heading(
+                clean_markdown(line[4:]), level=3
+            )
+
+        elif line.startswith("## "):
+            document.add_heading(
+                clean_markdown(line[3:]), level=2
+            )
+
+        elif line.startswith("# "):
+            document.add_heading(
+                clean_markdown(line[2:]), level=1
+            )
+
+        elif line.startswith(("- ", "* ")):
+            document.add_paragraph(
+                clean_markdown(line[2:]),
+                style="List Bullet"
+            )
+
+        elif re.match(r"^\d+\.\s", line):
+            document.add_paragraph(
+                clean_markdown(
+                    re.sub(r"^\d+\.\s", "", line)
+                ),
+                style="List Number"
+            )
+
+        else:
+            document.add_paragraph(clean_markdown(line))
+
+    # Generate Word file in memory
+    buffer = BytesIO()
+    document.save(buffer)
+    buffer.seek(0)
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={
+            "Content-Disposition": 'attachment; filename="researchly-report.docx"'
+        }
+    )
+
+@app.post("/api/export/pdf")
+async def export_pdf(request: ExportRequest):
+
+    buffer = BytesIO()
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        "ReportTitle",
+        parent=styles["Title"],
+        fontSize=22,
+        leading=28,
+        textColor=colors.HexColor("#17365D"),
+        spaceAfter=18
+    )
+
+    heading_style = ParagraphStyle(
+        "ReportHeading",
+        parent=styles["Heading2"],
+        fontSize=14,
+        leading=19,
+        textColor=colors.HexColor("#24527A"),
+        spaceBefore=14,
+        spaceAfter=8
+    )
+
+    body_style = ParagraphStyle(
+        "ReportBody",
+        parent=styles["BodyText"],
+        fontSize=10,
+        leading=16,
+        spaceAfter=8
+    )
+
+    story = [
+        Paragraph("Research Report", title_style),
+        Paragraph(escape(request.topic), heading_style),
+        Spacer(1, 12)
+    ]
+
+    for line in request.report.splitlines():
+
+        line = line.strip()
+
+        if not line:
+            continue
+
+        if line.startswith("# "):
+            story.append(
+                Paragraph(
+                    escape(clean_markdown(line[2:])),
+                    heading_style
+                )
+            )
+
+        elif line.startswith("## "):
+            story.append(
+                Paragraph(
+                    escape(clean_markdown(line[3:])),
+                    heading_style
+                )
+            )
+
+        elif line.startswith("### "):
+            story.append(
+                Paragraph(
+                    f"<b>{escape(clean_markdown(line[4:]))}</b>",
+                    body_style
+                )
+            )
+
+        elif line.startswith(("- ", "* ")):
+            story.append(
+                Paragraph(
+                    f"&bull; {escape(clean_markdown(line[2:]))}",
+                    body_style
+                )
+            )
+
+        elif re.match(r"^\d+\.\s", line):
+            story.append(
+                Paragraph(
+                    escape(clean_markdown(line)),
+                    body_style
+                )
+            )
+
+        else:
+            story.append(
+                Paragraph(
+                    escape(clean_markdown(line)),
+                    body_style
+                )
+            )
+
+    pdf = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=50,
+        leftMargin=50,
+        topMargin=50,
+        bottomMargin=50
+    )
+
+    pdf.build(story)
+    buffer.seek(0)
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": 'attachment; filename="researchly-report.pdf"'
+        }
+    )
